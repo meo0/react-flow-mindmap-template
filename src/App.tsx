@@ -24,6 +24,9 @@ import { useMindmapLayout } from './hooks/useMindmapLayout';
 import { calculateNodeSize } from './lib/layout';
 import type { AppNode, MindmapNodeData } from './nodes/types';
 
+// Custom event for toggling children
+const TOGGLE_CHILDREN_EVENT = 'mindmap:toggleChildren';
+
 const rfStyle = {
   backgroundColor: '#f0fdff'
 };
@@ -49,6 +52,50 @@ function Flow() {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // Listen for toggle children events from nodes
+  useEffect(() => {
+    // Count all descendants (children, grandchildren, etc.) recursively
+    const countAllDescendants = (nodeId: string): number => {
+      const directChildren = edges.filter(edge => edge.source === nodeId);
+      let count = directChildren.length;
+      for (const edge of directChildren) {
+        count += countAllDescendants(edge.target);
+      }
+      return count;
+    };
+
+    const handleToggleChildren = (e: Event) => {
+      const event = e as CustomEvent<{ nodeId: string }>;
+      const nodeId = event.detail.nodeId;
+
+      setNodes((nds) => {
+        // Calculate total descendant count (all hidden nodes)
+        const descendantCount = countAllDescendants(nodeId);
+
+        return nds.map((n) => {
+          if (n.id === nodeId) {
+            const nodeData = n.data as MindmapNodeData;
+            return {
+              ...n,
+              data: {
+                ...nodeData,
+                hidChildren: !nodeData.hidChildren,
+                childCount: descendantCount  // Store total descendant count
+              }
+            } as AppNode;
+          }
+          return n;
+        });
+      });
+
+      // Re-layout after toggling
+      setTimeout(autoLayout, 50);
+    };
+
+    window.addEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
+    return () => window.removeEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
+  }, [setNodes, edges, autoLayout]);
 
   // Handle new connections
   const onConnect: OnConnect = useCallback(
@@ -104,7 +151,9 @@ function Flow() {
 
         console.log('distances:', { distanceL, distanceR, position });
 
-        if (distanceL > 20 && distanceR > 20) {
+        // Minimum drag distance to create new node
+        const minDragDistance = 20;
+        if (distanceL > minDragDistance || distanceR > minDragDistance) {
           console.log('Creating new node!');
           // Create new node
           const newId = uuidv4();
@@ -136,22 +185,8 @@ function Flow() {
 
           // Re-layout after adding new node
           setTimeout(autoLayout, 150);
-        } else {
-          // Toggle children visibility if short drag
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id === sourceNode.id) {
-                const nodeData = n.data as MindmapNodeData;
-                return {
-                  ...n,
-                  data: { ...nodeData, hidChildren: !nodeData.hidChildren }
-                } as AppNode;
-              }
-              return n;
-            })
-          );
-          setTimeout(autoLayout, 150);
         }
+        // Note: Toggle children is now handled by click event on handle
       }
     },
     [nodes, reactFlowInstance, setNodes, setEdges, autoLayout]

@@ -43,8 +43,27 @@ export function useMindmapLayout<T extends Node>(
 
   const autoLayout = useCallback(() => {
     setNodes((currentNodes) => {
-      const layoutedNodes = calculateMindmapLayout(currentNodes, edgesRef.current, rootNodeId);
-      return layoutedNodes;
+      // Get only visible nodes and edges for layout calculation
+      const visibleNodes = getFilteredNodes(currentNodes, edgesRef.current);
+      const visibleEdges = getFilteredEdges(currentNodes, edgesRef.current);
+
+      // Calculate layout only for visible nodes
+      const layoutedVisibleNodes = calculateMindmapLayout(visibleNodes, visibleEdges, rootNodeId);
+
+      // Create a map of layouted positions
+      const positionMap = new Map<string, { x: number; y: number }>();
+      layoutedVisibleNodes.forEach(node => {
+        positionMap.set(node.id, node.position);
+      });
+
+      // Apply positions to original nodes (preserving hidden nodes with their original positions)
+      return currentNodes.map(node => {
+        const newPosition = positionMap.get(node.id);
+        if (newPosition) {
+          return { ...node, position: newPosition };
+        }
+        return node;
+      });
     });
   }, [setNodes, rootNodeId]);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, NodeProps, Position, useReactFlow } from '@xyflow/react';
 import type { MindmapNode as MindmapNodeType } from './types';
 
@@ -10,6 +10,9 @@ interface MindmapNodeProps extends NodeProps<MindmapNodeType> {
   onEditStart?: (id: string) => void;
   onEditEnd?: (id: string) => void;
 }
+
+// Custom event for toggling children
+const TOGGLE_CHILDREN_EVENT = 'mindmap:toggleChildren';
 
 export function MindmapNode({
   id,
@@ -36,11 +39,26 @@ export function MindmapNode({
   const leftHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'source' : 'target');
   const rightHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'target' : 'source');
 
-  // Calculate hidden children count
-  const getHiddenChildrenCount = () => {
-    if (!data.hidChildren) return 0;
-    return edges.filter(edge => edge.source === id).length;
-  };
+  // Calculate children count from edges (for non-collapsed state)
+  const edgeChildCount = edges.filter(edge => edge.source === id).length;
+
+  // Use stored childCount when collapsed, otherwise count from edges
+  const childCount = data.hidChildren ? (data.childCount ?? 0) : edgeChildCount;
+
+  // Check if this node has children (use stored count if collapsed)
+  const hasChildren = childCount > 0;
+
+  // Handle click on handle to toggle children visibility
+  const handleToggleChildren = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (hasChildren) {
+      // Dispatch custom event to toggle children
+      window.dispatchEvent(new CustomEvent(TOGGLE_CHILDREN_EVENT, {
+        detail: { nodeId: id }
+      }));
+    }
+  }, [id, hasChildren]);
 
   // Handle double click to edit
   const handleDoubleClick = () => {
@@ -89,12 +107,6 @@ export function MindmapNode({
     }
   };
 
-  const getHandleLabel = (handleType: string) => {
-    if (handleType === 'target') return '';
-    const hiddenCount = getHiddenChildrenCount();
-    return hiddenCount > 0 ? hiddenCount.toString() : '';
-  };
-
   return (
     <div
       className={`mindmap-node ${selected ? 'selected' : ''} ${isRootNode ? 'root-node' : ''}`}
@@ -121,16 +133,33 @@ export function MindmapNode({
           pointerEvents: leftHandleType === 'target' ? 'none' : 'auto'
         }}
       >
-        <div
-          style={{
-            transform: 'translateY(-2px)',
-            pointerEvents: 'none',
-            fontSize: '0.75rem',
-            color: '#4B5563'
-          }}
-        >
-          {getHandleLabel(leftHandleType)}
-        </div>
+        {leftHandleType === 'source' && (
+          <div
+            onClick={handleToggleChildren}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="nodrag nopan"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: hasChildren ? 'pointer' : 'default',
+              pointerEvents: hasChildren ? 'auto' : 'none',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              color: data.hidChildren ? '#1e40af' : '#6b7280',
+              background: data.hidChildren ? '#bfdbfe' : 'transparent',
+              borderRadius: '50%'
+            }}
+          >
+            {data.hidChildren && hasChildren ? childCount : ''}
+          </div>
+        )}
       </Handle>
 
       <div>
@@ -191,16 +220,33 @@ export function MindmapNode({
           pointerEvents: rightHandleType === 'target' ? 'none' : 'auto'
         }}
       >
-        <div
-          style={{
-            transform: 'translateY(-2px)',
-            pointerEvents: 'none',
-            fontSize: '0.75rem',
-            color: '#4B5563'
-          }}
-        >
-          {getHandleLabel(rightHandleType)}
-        </div>
+        {rightHandleType === 'source' && (
+          <div
+            onClick={handleToggleChildren}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="nodrag nopan"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: hasChildren ? 'pointer' : 'default',
+              pointerEvents: hasChildren ? 'auto' : 'none',
+              fontSize: '0.75rem',
+              fontWeight: 'bold',
+              color: data.hidChildren ? '#1e40af' : '#6b7280',
+              background: data.hidChildren ? '#bfdbfe' : 'transparent',
+              borderRadius: '50%'
+            }}
+          >
+            {data.hidChildren && hasChildren ? childCount : ''}
+          </div>
+        )}
       </Handle>
     </div>
   );
