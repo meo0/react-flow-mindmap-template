@@ -63,9 +63,14 @@ function Flow() {
   // Handle drag connection end (create new node)
   const onConnectEnd: OnConnectEnd = useCallback(
     (event, connectionState) => {
+      console.log('onConnectEnd called', connectionState);
+      console.log('fromNode id:', connectionState.fromNode?.id);
+      console.log('available nodes:', nodes.map(n => n.id));
+
       // Only create new node if not connected to existing node
       if (!connectionState.isValid) {
         const sourceNode = nodes.find(n => n.id === connectionState.fromNode?.id);
+        console.log('sourceNode found:', sourceNode);
         if (!sourceNode) return;
 
         // Get event position
@@ -97,7 +102,10 @@ function Flow() {
           Math.pow(position.y - sourceHandlePositionR.y, 2)
         );
 
+        console.log('distances:', { distanceL, distanceR, position });
+
         if (distanceL > 20 && distanceR > 20) {
+          console.log('Creating new node!');
           // Create new node
           const newId = uuidv4();
 
@@ -111,9 +119,8 @@ function Flow() {
             type: 'mindmap'
           };
 
-          // Determine source handle based on position
-          const isRootNode = sourceNode.id === 'root';
-          const sourceHandle = isRootNode
+          // Determine source handle (only for root node, same as reference)
+          const sourceHandle = sourceNode.id === 'root'
             ? (position.x > sourceNode.position.x ? 'r' : 'l')
             : undefined;
 

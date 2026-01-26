@@ -24,17 +24,15 @@ export function MindmapNode({
   const [inputWidth, setInputWidth] = useState(100);
   const { getNodes, getEdges, setNodes } = useReactFlow();
 
-  // Get current node position to determine handle types
+  // Get current nodes and edges to determine handle types
   const nodes = getNodes();
   const edges = getEdges();
-  const currentNode = nodes.find(n => n.id === id);
-  const nodeX = currentNode?.position.x ?? 0;
+  const nodeX = nodes.find(node => node.id === id)?.position.x ?? 0;
 
   // Determine if this is the root node (no incoming edges)
-  const hasIncomingEdge = edges.some(e => e.target === id);
-  const isRootNode = !hasIncomingEdge;
+  const isRootNode = !edges.some(e => e.target === id);
 
-  // Handle types based on position
+  // Handle types based on position (same as reference implementation)
   const leftHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'source' : 'target');
   const rightHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'target' : 'source');
 

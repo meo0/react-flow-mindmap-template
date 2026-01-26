@@ -38,9 +38,11 @@ export function useMindmapLayout<T extends Node>(
   const { rootNodeId = 'root' } = options;
 
   const autoLayout = useCallback(() => {
-    const layoutedNodes = calculateMindmapLayout(nodes, edges, rootNodeId);
-    setNodes(layoutedNodes);
-  }, [nodes, edges, setNodes, rootNodeId]);
+    setNodes((currentNodes) => {
+      const layoutedNodes = calculateMindmapLayout(currentNodes, edges, rootNodeId);
+      return layoutedNodes;
+    });
+  }, [edges, setNodes, rootNodeId]);
 
   const getVisibleNodes = useCallback(() => {
     return getFilteredNodes(nodes, edges);
