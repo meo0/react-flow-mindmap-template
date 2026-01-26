@@ -129,6 +129,65 @@ export const calculateLayout = <T extends Node>(
 };
 
 /**
+ * Determine which side (left/right) each node belongs to based on edge sourceHandle
+ */
+const determineNodeSides = (
+  edges: Edge[],
+  rootNodeId: string
+): { leftNodeIds: Set<string>; rightNodeIds: Set<string> } => {
+  const leftNodeIds = new Set<string>();
+  const rightNodeIds = new Set<string>();
+
+  // Build adjacency map: parent -> children
+  const childrenMap = new Map<string, string[]>();
+  const edgeMap = new Map<string, Edge>();
+
+  edges.forEach(edge => {
+    if (!childrenMap.has(edge.source)) {
+      childrenMap.set(edge.source, []);
+    }
+    childrenMap.get(edge.source)!.push(edge.target);
+    edgeMap.set(`${edge.source}->${edge.target}`, edge);
+  });
+
+  // BFS to determine sides, starting from root's direct children
+  const queue: { nodeId: string; side: 'left' | 'right' }[] = [];
+
+  // Initialize with root's direct children based on sourceHandle
+  const rootChildren = childrenMap.get(rootNodeId) || [];
+  rootChildren.forEach(childId => {
+    const edge = edgeMap.get(`${rootNodeId}->${childId}`);
+    const side = edge?.sourceHandle === 'l' ? 'left' : 'right';
+    queue.push({ nodeId: childId, side });
+  });
+
+  // Process queue (BFS)
+  while (queue.length > 0) {
+    const { nodeId, side } = queue.shift()!;
+
+    // Skip if already processed
+    if (leftNodeIds.has(nodeId) || rightNodeIds.has(nodeId)) {
+      continue;
+    }
+
+    // Assign side
+    if (side === 'left') {
+      leftNodeIds.add(nodeId);
+    } else {
+      rightNodeIds.add(nodeId);
+    }
+
+    // Add children with inherited side
+    const children = childrenMap.get(nodeId) || [];
+    children.forEach(childId => {
+      queue.push({ nodeId: childId, side });
+    });
+  }
+
+  return { leftNodeIds, rightNodeIds };
+};
+
+/**
  * Calculate mindmap layout with central node and bidirectional branches
  */
 export const calculateMindmapLayout = <T extends Node>(
@@ -141,127 +200,68 @@ export const calculateMindmapLayout = <T extends Node>(
     return nodes;
   }
 
-  // Get direct children of root node
-  const childrenIds: string[] = [];
-  edges.forEach(edge => {
-    if (edge.source === rootNodeId) {
-      childrenIds.push(edge.target);
-    }
-  });
+  // Determine which side each node belongs to
+  const { leftNodeIds, rightNodeIds } = determineNodeSides(edges, rootNodeId);
 
-  // Split children into left and right groups based on x position
-  const rightGroupIds: Set<string> = new Set();
-  const leftGroupIds: Set<string> = new Set();
-
-  childrenIds.forEach((id, index) => {
-    const node = nodes.find(n => n.id === id);
-    if (!node || !node.position) {
-      // Alternate if position not available
-      if (index % 2 === 0) {
-        rightGroupIds.add(id);
-      } else {
-        leftGroupIds.add(id);
-      }
-      return;
-    }
-
-    // Split based on x position
-    if (node.position.x >= 0) {
-      rightGroupIds.add(id);
-    } else {
-      leftGroupIds.add(id);
-    }
-  });
-
-  // Create groups including descendants
-  const rightGroupNodes: T[] = [];
-  const leftGroupNodes: T[] = [];
+  // Build node and edge groups
+  const rightGroupNodes: T[] = [centralNode];
+  const leftGroupNodes: T[] = [centralNode];
   const rightGroupEdges: Edge[] = [];
   const leftGroupEdges: Edge[] = [];
 
-  // Add root node to both groups
-  rightGroupNodes.push(centralNode);
-  leftGroupNodes.push(centralNode);
+  nodes.forEach(node => {
+    if (node.id === rootNodeId) return;
 
-  // Add edges from root to direct children
-  edges.forEach(edge => {
-    if (edge.source === rootNodeId) {
-      const targetId = edge.target;
-      if (rightGroupIds.has(targetId)) {
-        rightGroupEdges.push(edge);
-      }
-      if (leftGroupIds.has(targetId)) {
-        leftGroupEdges.push(edge);
-      }
+    if (rightNodeIds.has(node.id)) {
+      rightGroupNodes.push(node);
+    } else if (leftNodeIds.has(node.id)) {
+      leftGroupNodes.push(node);
     }
   });
 
-  // Recursively add descendants to groups
-  const addNodeAndDescendants = (
-    nodeId: string,
-    groupNodes: T[],
-    groupEdges: Edge[],
-    groupIds: Set<string>
-  ) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-
-    groupNodes.push(node);
-    groupIds.add(nodeId);
-
-    edges.forEach(edge => {
-      if (edge.source === nodeId && edge.source !== rootNodeId) {
-        groupEdges.push(edge);
-        addNodeAndDescendants(edge.target, groupNodes, groupEdges, groupIds);
-      }
-    });
-  };
-
-  rightGroupIds.forEach(id => {
-    addNodeAndDescendants(id, rightGroupNodes, rightGroupEdges, rightGroupIds);
-  });
-
-  leftGroupIds.forEach(id => {
-    addNodeAndDescendants(id, leftGroupNodes, leftGroupEdges, leftGroupIds);
+  edges.forEach(edge => {
+    if (rightNodeIds.has(edge.target)) {
+      rightGroupEdges.push(edge);
+    } else if (leftNodeIds.has(edge.target)) {
+      leftGroupEdges.push(edge);
+    }
   });
 
   // Calculate layout for each group
   const rightLayoutNodes = calculateLayout(rightGroupNodes, rightGroupEdges, rootNodeId);
   const leftLayoutNodes = calculateLayout(leftGroupNodes, leftGroupEdges, rootNodeId);
 
-  // Get central node positions after layout
-  const centralNodeRight = rightLayoutNodes.find(node => node.id === rootNodeId);
-  const centralNodeLeft = leftLayoutNodes.find(node => node.id === rootNodeId);
+  // Create result map for easy lookup
+  const resultMap = new Map<string, T>();
 
-  if (!centralNodeRight || !centralNodeLeft || !centralNodeRight.position || !centralNodeLeft.position) {
-    return nodes;
-  }
+  // Add right nodes (including root)
+  rightLayoutNodes.forEach(node => {
+    resultMap.set(node.id, node);
+  });
 
-  // Flip left nodes to the left side of central node
-  const flippedLeftNodes = leftLayoutNodes.map(node => {
+  // Flip and add left nodes (root position comes from right layout)
+  leftLayoutNodes.forEach(node => {
     if (node.id !== rootNodeId) {
-      const relativeX = node.position.x;
-      return {
+      // Simple flip: negate x position relative to root
+      const flippedNode = {
         ...node,
         position: {
-          x: -relativeX + (centralNodeLeft.measured?.width || 0) - (node.measured?.width || 0),
+          x: -node.position.x,
           y: node.position.y
         }
       };
-    }
-    return node;
-  });
-
-  // Merge results (exclude duplicate root node from left)
-  const resultNodes = [...rightLayoutNodes];
-
-  flippedLeftNodes.forEach(node => {
-    if (node.id !== rootNodeId) {
-      resultNodes.push(node);
+      resultMap.set(node.id, flippedNode);
     }
   });
 
-  return resultNodes;
+  // Preserve nodes that weren't part of any group (orphans) with original positions
+  nodes.forEach(node => {
+    if (!resultMap.has(node.id)) {
+      resultMap.set(node.id, node);
+    }
+  });
+
+  return Array.from(resultMap.values());
 };
 
 /**
