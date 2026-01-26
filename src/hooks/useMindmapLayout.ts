@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { calculateMindmapLayout, getFilteredNodes, getFilteredEdges } from '../lib/layout';
 
@@ -37,12 +37,16 @@ export function useMindmapLayout<T extends Node>(
 ): UseMindmapLayoutReturn<T> {
   const { rootNodeId = 'root' } = options;
 
+  // Keep a ref to always access the latest edges
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
+
   const autoLayout = useCallback(() => {
     setNodes((currentNodes) => {
-      const layoutedNodes = calculateMindmapLayout(currentNodes, edges, rootNodeId);
+      const layoutedNodes = calculateMindmapLayout(currentNodes, edgesRef.current, rootNodeId);
       return layoutedNodes;
     });
-  }, [edges, setNodes, rootNodeId]);
+  }, [setNodes, rootNodeId]);
 
   const getVisibleNodes = useCallback(() => {
     return getFilteredNodes(nodes, edges);

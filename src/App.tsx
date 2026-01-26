@@ -55,7 +55,7 @@ function Flow() {
     (connection) => {
       setEdges((eds) => addEdge(connection, eds));
       // Re-layout after connection
-      setTimeout(autoLayout, 50);
+      setTimeout(autoLayout, 150);
     },
     [setEdges, autoLayout]
   );
@@ -135,7 +135,7 @@ function Flow() {
           setEdges((eds) => [...eds, newEdge]);
 
           // Re-layout after adding new node
-          setTimeout(autoLayout, 50);
+          setTimeout(autoLayout, 150);
         } else {
           // Toggle children visibility if short drag
           setNodes((nds) =>
@@ -150,7 +150,7 @@ function Flow() {
               return n;
             })
           );
-          setTimeout(autoLayout, 50);
+          setTimeout(autoLayout, 150);
         }
       }
     },
@@ -163,7 +163,7 @@ function Flow() {
       // Don't allow deleting root node
       const filteredNodes = nodesToDelete.filter(n => n.id !== 'root');
       if (filteredNodes.length > 0) {
-        setTimeout(autoLayout, 50);
+        setTimeout(autoLayout, 150);
       }
     },
     [autoLayout]
