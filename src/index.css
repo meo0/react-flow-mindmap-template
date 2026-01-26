@@ -1,0 +1,56 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Mindmap node styles */
+.mindmap-node {
+  transition: all 0.2s ease;
+}
+
+.mindmap-node:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.mindmap-node.selected {
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+.mindmap-node.root-node {
+  font-weight: 600;
+}
+
+/* React Flow customization */
+.react-flow__node {
+  cursor: grab;
+}
+
+.react-flow__node:active {
+  cursor: grabbing;
+}
+
+.react-flow__handle {
+  cursor: crosshair;
+}
+
+.react-flow__edge-path {
+  stroke: #93c5fd;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6;
+}
+
+/* Panel button hover */
+.react-flow__panel button:hover {
+  background: #2563eb !important;
+}
