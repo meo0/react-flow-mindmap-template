@@ -24,6 +24,7 @@ export function MindmapNode({
   const [inputValue, setInputValue] = useState(data.label);
   const spanRef = useRef<HTMLSpanElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nodeRef = useRef<HTMLDivElement>(null);
   const [inputWidth, setInputWidth] = useState(100);
   const { getNodes, getEdges, setNodes } = useReactFlow();
 
@@ -64,6 +65,28 @@ export function MindmapNode({
   const handleDoubleClick = () => {
     setIsEditing(true);
   };
+
+  // Start editing function
+  const startEditing = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  // Handle keyboard shortcuts on node (F2 or Enter to edit)
+  const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (isEditing) return;
+    if (e.key === 'F2' || e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      startEditing();
+    }
+  }, [isEditing, startEditing]);
+
+  // Focus node when selected (to enable keyboard shortcuts)
+  useEffect(() => {
+    if (selected && !isEditing && nodeRef.current) {
+      nodeRef.current.focus();
+    }
+  }, [selected, isEditing]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -109,6 +132,9 @@ export function MindmapNode({
 
   return (
     <div
+      ref={nodeRef}
+      tabIndex={0}
+      onKeyDown={handleNodeKeyDown}
       className={`mindmap-node ${selected ? 'selected' : ''} ${isRootNode ? 'root-node' : ''}`}
       style={{
         padding: '4px 8px',
@@ -117,7 +143,9 @@ export function MindmapNode({
         background: isRootNode ? '#93c5fd' : '#dbeafe',
         minWidth: '40px',
         textAlign: 'center',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        outline: 'none',
+        position: 'relative'
       }}
     >
       <Handle
@@ -187,10 +215,52 @@ export function MindmapNode({
             style={{
               padding: '4px',
               minWidth: '40px',
-              minHeight: '20px'
+              minHeight: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
             }}
           >
-            {data.label}
+            <span>{data.label}</span>
+            {selected && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditing();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="nodrag"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0.6,
+                  transition: 'opacity 0.15s'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                title="編集 (F2 / Enter)"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
         <span
