@@ -25,8 +25,11 @@ import { useMindmapDrag } from './hooks/useMindmapDrag';
 import { calculateNodeSize } from './lib/layout';
 import type { AppNode, MindmapNodeData } from './nodes/types';
 
-// Custom event for toggling children
+// Custom events
 const TOGGLE_CHILDREN_EVENT = 'mindmap:toggleChildren';
+const CREATE_CHILD_EVENT = 'mindmap:createChild';
+const CREATE_SIBLING_EVENT = 'mindmap:createSibling';
+const START_EDIT_EVENT = 'mindmap:startEdit';
 
 const rfStyle = {
   backgroundColor: '#f0fdff'
@@ -103,6 +106,153 @@ function Flow() {
     window.addEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
     return () => window.removeEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
   }, [setNodes, edges, autoLayout]);
+
+  // Listen for create child events
+  useEffect(() => {
+    const handleCreateChild = (e: Event) => {
+      const event = e as CustomEvent<{ nodeId: string; branch: 'l' | 'r' | null }>;
+      const { nodeId, branch: parentBranch } = event.detail;
+
+      const parentNode = nodes.find(n => n.id === nodeId);
+      if (!parentNode) return;
+
+      // Uncollapse parent if collapsed
+      if ((parentNode.data as MindmapNodeData).hidChildren) {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? { ...n, data: { ...n.data, hidChildren: false } } as AppNode
+              : n
+          )
+        );
+      }
+
+      // Determine branch for new node
+      let nodeBranch: 'l' | 'r';
+      let sourceHandle: string;
+      let targetHandle: string;
+
+      if (nodeId === 'root') {
+        // For root node, default to right branch (or use parentBranch if specified)
+        nodeBranch = parentBranch || 'r';
+      } else {
+        // Inherit branch from parent
+        nodeBranch = parentBranch || 'r';
+      }
+
+      sourceHandle = nodeBranch;
+      targetHandle = nodeBranch === 'r' ? 'l' : 'r';
+
+      const newId = uuidv4();
+      const newNode: AppNode = {
+        id: newId,
+        position: { x: 0, y: 0 }, // Will be positioned by autoLayout
+        data: {
+          label: 'New Topic',
+          hidChildren: false,
+          branch: nodeBranch
+        },
+        type: 'mindmap'
+      };
+
+      const newEdge: Edge = {
+        id: `${nodeId}->${newId}`,
+        source: nodeId,
+        sourceHandle,
+        target: newId,
+        targetHandle
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setEdges((eds) => [...eds, newEdge]);
+
+      // Re-layout and then start editing the new node
+      setTimeout(() => {
+        autoLayout();
+        // Select the new node
+        setNodes((nds) =>
+          nds.map((n) => ({
+            ...n,
+            selected: n.id === newId
+          }))
+        );
+        // Dispatch start edit event for the new node
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
+            detail: { nodeId: newId }
+          }));
+        }, 100);
+      }, 150);
+    };
+
+    window.addEventListener(CREATE_CHILD_EVENT, handleCreateChild);
+    return () => window.removeEventListener(CREATE_CHILD_EVENT, handleCreateChild);
+  }, [nodes, setNodes, setEdges, autoLayout]);
+
+  // Listen for create sibling events
+  useEffect(() => {
+    const handleCreateSibling = (e: Event) => {
+      const event = e as CustomEvent<{ nodeId: string; branch: 'l' | 'r' | null }>;
+      const { nodeId, branch: currentBranch } = event.detail;
+
+      // Find the parent edge to get the parent node
+      const parentEdge = edges.find(edge => edge.target === nodeId);
+      if (!parentEdge) return; // Root node has no parent, shouldn't happen
+
+      const parentNodeId = parentEdge.source;
+      const currentNode = nodes.find(n => n.id === nodeId);
+      if (!currentNode) return;
+
+      // Inherit branch from current node
+      const nodeBranch = currentBranch || 'r';
+      const sourceHandle = parentEdge.sourceHandle || nodeBranch;
+      const targetHandle = parentEdge.targetHandle || (nodeBranch === 'r' ? 'l' : 'r');
+
+      const newId = uuidv4();
+      const newNode: AppNode = {
+        id: newId,
+        position: { x: 0, y: 0 }, // Will be positioned by autoLayout
+        data: {
+          label: 'New Topic',
+          hidChildren: false,
+          branch: nodeBranch
+        },
+        type: 'mindmap'
+      };
+
+      const newEdge: Edge = {
+        id: `${parentNodeId}->${newId}`,
+        source: parentNodeId,
+        sourceHandle,
+        target: newId,
+        targetHandle
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setEdges((eds) => [...eds, newEdge]);
+
+      // Re-layout and then start editing the new node
+      setTimeout(() => {
+        autoLayout();
+        // Select the new node
+        setNodes((nds) =>
+          nds.map((n) => ({
+            ...n,
+            selected: n.id === newId
+          }))
+        );
+        // Dispatch start edit event for the new node
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
+            detail: { nodeId: newId }
+          }));
+        }, 100);
+      }, 150);
+    };
+
+    window.addEventListener(CREATE_SIBLING_EVENT, handleCreateSibling);
+    return () => window.removeEventListener(CREATE_SIBLING_EVENT, handleCreateSibling);
+  }, [nodes, edges, setNodes, setEdges, autoLayout]);
 
   // Handle new connections
   const onConnect: OnConnect = useCallback(

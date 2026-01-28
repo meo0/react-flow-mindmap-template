@@ -11,8 +11,11 @@ interface MindmapNodeProps extends NodeProps<MindmapNodeType> {
   onEditEnd?: (id: string) => void;
 }
 
-// Custom event for toggling children
+// Custom events
 const TOGGLE_CHILDREN_EVENT = 'mindmap:toggleChildren';
+const CREATE_CHILD_EVENT = 'mindmap:createChild';
+const CREATE_SIBLING_EVENT = 'mindmap:createSibling';
+const START_EDIT_EVENT = 'mindmap:startEdit';
 
 export function MindmapNode({
   id,
@@ -23,9 +26,10 @@ export function MindmapNode({
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(data.label);
   const spanRef = useRef<HTMLSpanElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const [inputWidth, setInputWidth] = useState(100);
+  const [inputRows, setInputRows] = useState(1);
   const { getNodes, getEdges, setNodes } = useReactFlow();
 
   // Get current nodes and edges to determine handle types
@@ -107,15 +111,58 @@ export function MindmapNode({
     setIsEditing(true);
   }, []);
 
-  // Handle keyboard shortcuts on node (F2 or Enter to edit)
+  // Handle keyboard shortcuts on node
   const handleNodeKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (isEditing) return;
-    if (e.key === 'F2' || e.key === 'Enter') {
+
+    // F2 or Shift+Enter: Start editing
+    if (e.key === 'F2' || (e.key === 'Enter' && e.shiftKey)) {
       e.preventDefault();
       e.stopPropagation();
       startEditing();
+      return;
     }
-  }, [isEditing, startEditing]);
+
+    // Tab: Create child node
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      window.dispatchEvent(new CustomEvent(CREATE_CHILD_EVENT, {
+        detail: { nodeId: id, branch }
+      }));
+      return;
+    }
+
+    // Enter: Create sibling node (root creates child instead)
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isRootNode) {
+        // Root node cannot have siblings, create child instead
+        window.dispatchEvent(new CustomEvent(CREATE_CHILD_EVENT, {
+          detail: { nodeId: id, branch }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent(CREATE_SIBLING_EVENT, {
+          detail: { nodeId: id, branch }
+        }));
+      }
+      return;
+    }
+  }, [isEditing, startEditing, id, branch, isRootNode]);
+
+  // Listen for start edit event (for newly created nodes)
+  useEffect(() => {
+    const handleStartEdit = (e: Event) => {
+      const event = e as CustomEvent<{ nodeId: string }>;
+      if (event.detail.nodeId === id) {
+        setIsEditing(true);
+      }
+    };
+
+    window.addEventListener(START_EDIT_EVENT, handleStartEdit);
+    return () => window.removeEventListener(START_EDIT_EVENT, handleStartEdit);
+  }, [id]);
 
   // Focus node when selected (to enable keyboard shortcuts)
   useEffect(() => {
@@ -137,10 +184,16 @@ export function MindmapNode({
     setInputValue(data.label);
   }, [data.label]);
 
-  // Calculate input width from span
+  // Calculate input width from span (longest line) and rows
   useEffect(() => {
-    if (spanRef.current && spanRef.current.offsetWidth) {
-      setInputWidth(spanRef.current.offsetWidth);
+    const lines = inputValue.split('\n');
+    setInputRows(Math.max(1, lines.length));
+
+    if (spanRef.current) {
+      // Calculate width based on longest line
+      const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
+      spanRef.current.textContent = longestLine || ' ';
+      setInputWidth(Math.max(50, spanRef.current.offsetWidth));
     } else {
       setInputWidth(50);
     }
@@ -158,6 +211,12 @@ export function MindmapNode({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        // Shift+Enter: Allow newline (don't prevent default)
+        return;
+      }
+      // Enter: Save and exit
+      e.preventDefault();
       handleBlur();
     }
     if (e.key === 'Escape') {
@@ -228,12 +287,13 @@ export function MindmapNode({
 
       <div>
         {isEditing ? (
-          <input
+          <textarea
             ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
+            rows={inputRows}
             className="nodrag"
             style={{
               width: inputWidth + 16,
@@ -242,7 +302,11 @@ export function MindmapNode({
               borderRadius: '4px',
               padding: '4px',
               textAlign: 'center',
-              outline: 'none'
+              outline: 'none',
+              resize: 'none',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit'
             }}
           />
         ) : (
@@ -258,7 +322,7 @@ export function MindmapNode({
               gap: '4px'
             }}
           >
-            <span>{data.label}</span>
+            <span style={{ whiteSpace: 'pre-wrap' }}>{data.label}</span>
             {selected && (
               <button
                 onClick={(e) => {
@@ -280,7 +344,7 @@ export function MindmapNode({
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
-                title="編集 (F2 / Enter)"
+                title="編集 (Shift+Enter / F2)"
               >
                 <svg
                   width="12"
