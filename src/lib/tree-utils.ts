@@ -180,16 +180,11 @@ export const updateBranchEdgesRecursive = (
   const newSourceHandle = newBranch;
   const newTargetHandle = newBranch === 'l' ? 'r' : 'l';
 
-  // Use timestamp to force React Flow to recognize edges as new
-  const timestamp = Date.now();
-
   return edges.map(edge => {
     // Update the root->node edge
     if (edge.source === rootNodeId && edge.target === nodeId) {
       return {
         ...edge,
-        // Add timestamp to ID to force React Flow re-render
-        id: `${edge.source}->${edge.target}-${timestamp}`,
         sourceHandle: newSourceHandle,
         targetHandle: newTargetHandle
       };
@@ -200,8 +195,6 @@ export const updateBranchEdgesRecursive = (
     if (descendantIds.has(edge.source)) {
       return {
         ...edge,
-        // Add timestamp to ID to force React Flow re-render
-        id: `${edge.source}->${edge.target}-${timestamp}`,
         sourceHandle: newSourceHandle,
         targetHandle: newTargetHandle
       };

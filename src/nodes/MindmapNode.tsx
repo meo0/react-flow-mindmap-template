@@ -38,9 +38,13 @@ export function MindmapNode({
   // Determine if this is the root node (no incoming edges)
   const isRootNode = !parentEdge;
 
-  // Determine branch by traversing up to find an edge with explicit handles
-  // or by checking node position as fallback
+  // Determine branch from data (set during drag) or by traversing edges
   const determineBranch = (): 'l' | 'r' => {
+    // First, check if branch is explicitly set in node data
+    if (data.branch) {
+      return data.branch;
+    }
+
     let currentNodeId = id;
     let currentEdge = parentEdge;
 

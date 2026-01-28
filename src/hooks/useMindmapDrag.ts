@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import type { Node, Edge, OnNodeDrag } from '@xyflow/react';
+import { useUpdateNodeInternals } from '@xyflow/react';
 import {
   getDescendantIds,
   getSiblingInfo,
@@ -47,6 +48,7 @@ export function useMindmapDrag<T extends Node>(
   options: UseMindmapDragOptions = {}
 ): UseMindmapDragReturn<T> {
   const { rootNodeId = 'root' } = options;
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Keep refs to always access the latest state
   const nodesRef = useRef(nodes);
@@ -193,7 +195,40 @@ export function useMindmapDrag<T extends Node>(
           );
           updatedEdges = reorderEdges(updatedEdges, rootNodeId, newOrder);
 
+          // Get all affected node IDs (node itself and all descendants)
+          const affectedNodeIds = new Set([node.id]);
+          getDescendantIds(node.id, currentEdges).forEach(id => affectedNodeIds.add(id));
+
+          // Update edges
           setEdges(updatedEdges);
+
+          // Update branch info in node data for all affected nodes
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (affectedNodeIds.has(n.id)) {
+                // Update branch info in node data
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    branch: newBranch
+                  }
+                };
+              }
+              return n;
+            })
+          );
+
+          // Force React Flow to update node internals (handle positions)
+          // This is necessary when handles change type (source <-> target)
+          setTimeout(() => {
+            affectedNodeIds.forEach((nodeId) => {
+              updateNodeInternals(nodeId);
+            });
+            // Also update root node since its connections changed
+            updateNodeInternals(rootNodeId);
+          }, 0);
+
           setTimeout(autoLayout, 50);
 
           // Reset drag state

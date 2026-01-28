@@ -165,33 +165,43 @@ function Flow() {
           // Create new node
           const newId = uuidv4();
 
+          // Determine source and target handles based on branch
+          let sourceHandle: string | undefined;
+          let targetHandle: string | undefined;
+          let nodeBranch: 'l' | 'r' | undefined;
+
+          if (sourceNode.id === 'root') {
+            // For root node, determine branch by position
+            nodeBranch = position.x > sourceNode.position.x ? 'r' : 'l';
+            sourceHandle = nodeBranch;
+            targetHandle = nodeBranch === 'r' ? 'l' : 'r';
+          } else {
+            // For non-root nodes, inherit branch from parent's edge or data
+            const sourceNodeData = sourceNode.data as { branch?: 'l' | 'r' };
+            if (sourceNodeData.branch) {
+              nodeBranch = sourceNodeData.branch;
+              sourceHandle = nodeBranch;
+              targetHandle = nodeBranch === 'r' ? 'l' : 'r';
+            } else {
+              const parentEdge = edges.find(e => e.target === sourceNode.id);
+              if (parentEdge?.sourceHandle) {
+                nodeBranch = parentEdge.sourceHandle as 'l' | 'r';
+                sourceHandle = parentEdge.sourceHandle;
+                targetHandle = parentEdge.sourceHandle === 'r' ? 'l' : 'r';
+              }
+            }
+          }
+
           const newNode: AppNode = {
             id: newId,
             position,
             data: {
               label: 'New Topic',
-              hidChildren: false
+              hidChildren: false,
+              branch: nodeBranch
             },
             type: 'mindmap'
           };
-
-          // Determine source and target handles based on branch
-          let sourceHandle: string | undefined;
-          let targetHandle: string | undefined;
-
-          if (sourceNode.id === 'root') {
-            // For root node, determine branch by position
-            const branch = position.x > sourceNode.position.x ? 'r' : 'l';
-            sourceHandle = branch;
-            targetHandle = branch === 'r' ? 'l' : 'r';
-          } else {
-            // For non-root nodes, inherit branch from parent's edge
-            const parentEdge = edges.find(e => e.target === sourceNode.id);
-            if (parentEdge?.sourceHandle) {
-              sourceHandle = parentEdge.sourceHandle;
-              targetHandle = parentEdge.sourceHandle === 'r' ? 'l' : 'r';
-            }
-          }
 
           const newEdge: Edge = {
             id: `${sourceNode.id}->${newId}`,
