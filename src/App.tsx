@@ -22,6 +22,7 @@ import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { useMindmapLayout } from './hooks/useMindmapLayout';
 import { useMindmapDrag } from './hooks/useMindmapDrag';
+import { useViewportUtils } from './hooks/useViewportUtils';
 import { calculateNodeSize } from './lib/layout';
 import type { AppNode, MindmapNodeData } from './nodes/types';
 
@@ -53,6 +54,9 @@ function Flow() {
     useMindmapDrag(nodes, edges, setNodes, setEdges, autoLayout, {
       rootNodeId: 'root'
     });
+
+  // Use viewport utils hook
+  const { ensureNodeVisible } = useViewportUtils();
 
   // Auto-layout on initial render
   useEffect(() => {
@@ -176,18 +180,21 @@ function Flow() {
             selected: n.id === newId
           }))
         );
-        // Dispatch start edit event for the new node
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
-            detail: { nodeId: newId }
-          }));
-        }, 100);
+        // Ensure node is visible, then start editing
+        setTimeout(async () => {
+          await ensureNodeVisible(newId, { duration: 200 });
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
+              detail: { nodeId: newId }
+            }));
+          }, 50);
+        }, 50);
       }, 150);
     };
 
     window.addEventListener(CREATE_CHILD_EVENT, handleCreateChild);
     return () => window.removeEventListener(CREATE_CHILD_EVENT, handleCreateChild);
-  }, [nodes, setNodes, setEdges, autoLayout]);
+  }, [nodes, setNodes, setEdges, autoLayout, ensureNodeVisible]);
 
   // Listen for create sibling events
   useEffect(() => {
@@ -241,18 +248,21 @@ function Flow() {
             selected: n.id === newId
           }))
         );
-        // Dispatch start edit event for the new node
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
-            detail: { nodeId: newId }
-          }));
-        }, 100);
+        // Ensure node is visible, then start editing
+        setTimeout(async () => {
+          await ensureNodeVisible(newId, { duration: 200 });
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent(START_EDIT_EVENT, {
+              detail: { nodeId: newId }
+            }));
+          }, 50);
+        }, 50);
       }, 150);
     };
 
     window.addEventListener(CREATE_SIBLING_EVENT, handleCreateSibling);
     return () => window.removeEventListener(CREATE_SIBLING_EVENT, handleCreateSibling);
-  }, [nodes, edges, setNodes, setEdges, autoLayout]);
+  }, [nodes, edges, setNodes, setEdges, autoLayout, ensureNodeVisible]);
 
   // Handle new connections
   const onConnect: OnConnect = useCallback(
@@ -364,13 +374,18 @@ function Flow() {
           setNodes((nds) => [...nds, newNode]);
           setEdges((eds) => [...eds, newEdge]);
 
-          // Re-layout after adding new node
-          setTimeout(autoLayout, 150);
+          // Re-layout after adding new node, then ensure visibility
+          setTimeout(() => {
+            autoLayout();
+            setTimeout(() => {
+              ensureNodeVisible(newId, { duration: 200 });
+            }, 50);
+          }, 150);
         }
         // Note: Toggle children is now handled by click event on handle
       }
     },
-    [nodes, reactFlowInstance, setNodes, setEdges, autoLayout]
+    [nodes, reactFlowInstance, setNodes, setEdges, autoLayout, ensureNodeVisible]
   );
 
   // Handle node deletion
