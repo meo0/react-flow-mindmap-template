@@ -372,7 +372,25 @@ function Flow() {
             targetHandle
           };
 
-          setNodes((nds) => [...nds, newNode]);
+          setNodes((nds) => {
+            // Check if source node has hidChildren (collapsed)
+            const sourceNodeData = sourceNode.data as MindmapNodeData;
+            const shouldExpandParent = sourceNodeData.hidChildren;
+
+            const updatedNodes = shouldExpandParent
+              ? nds.map((n) => {
+                  if (n.id === sourceNode.id) {
+                    // Expand the parent node when adding a child via drag
+                    return {
+                      ...n,
+                      data: { ...(n.data as MindmapNodeData), hidChildren: false }
+                    } as AppNode;
+                  }
+                  return n;
+                })
+              : nds;
+            return [...updatedNodes, newNode];
+          });
           setEdges((eds) => [...eds, newEdge]);
 
           // Re-layout after adding new node, then ensure visibility
