@@ -301,3 +301,40 @@ export const getFilteredEdges = <T extends Node>(nodes: T[], edges: Edge[]): Edg
     visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
   );
 };
+
+/**
+ * Estimate the initial position for a new node
+ * This provides an approximate position to avoid flickering when the node is created.
+ * The exact position will be determined by autoLayout after rendering.
+ */
+export const estimateNewNodePosition = (
+  nodes: Node[],
+  parentId: string,
+  isChild: boolean,  // true: child node, false: sibling node
+  branch: 'l' | 'r'
+): { x: number; y: number } => {
+  // Offset constants based on layout settings
+  const HORIZONTAL_OFFSET = DEFAULT_NODE_WIDTH + NODE_SPACING_HORIZONTAL; // 250
+  const VERTICAL_OFFSET = DEFAULT_NODE_HEIGHT + NODE_SPACING_VERTICAL * 4; // 72
+
+  if (isChild) {
+    // Child node: position horizontally from parent
+    const parentNode = nodes.find(n => n.id === parentId);
+    if (!parentNode) return { x: 0, y: 0 };
+
+    const xOffset = branch === 'l' ? -HORIZONTAL_OFFSET : HORIZONTAL_OFFSET;
+    return {
+      x: parentNode.position.x + xOffset,
+      y: parentNode.position.y
+    };
+  } else {
+    // Sibling node: position vertically from reference node
+    const referenceNode = nodes.find(n => n.id === parentId);
+    if (!referenceNode) return { x: 0, y: 0 };
+
+    return {
+      x: referenceNode.position.x,
+      y: referenceNode.position.y + VERTICAL_OFFSET
+    };
+  }
+};

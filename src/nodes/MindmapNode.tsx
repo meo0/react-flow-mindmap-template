@@ -28,6 +28,8 @@ export function MindmapNode({
   const spanRef = useRef<HTMLSpanElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
   const [inputWidth, setInputWidth] = useState(100);
   const [inputRows, setInputRows] = useState(1);
   const { getNodes, getEdges, setNodes } = useReactFlow();
@@ -89,16 +91,44 @@ export function MindmapNode({
   // Check if this node has children (use stored count if collapsed)
   const hasChildren = childCount > 0;
 
-  // Handle click on handle to toggle children visibility
-  const handleToggleChildren = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (hasChildren) {
-      // Dispatch custom event to toggle children
-      window.dispatchEvent(new CustomEvent(TOGGLE_CHILDREN_EVENT, {
-        detail: { nodeId: id }
-      }));
-    }
+  // Handle collapse button mouse down - distinguish click vs drag
+  const handleCollapseButtonMouseDown = useCallback((e: React.MouseEvent) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = false;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current) return;
+
+      const dx = moveEvent.clientX - dragStartRef.current.x;
+      const dy = moveEvent.clientY - dragStartRef.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance >= 5 && !isDraggingRef.current) {
+        isDraggingRef.current = true;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        dragStartRef.current = null;
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      if (!isDraggingRef.current && hasChildren) {
+        e.stopPropagation();
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent(TOGGLE_CHILDREN_EVENT, {
+          detail: { nodeId: id }
+        }));
+      }
+
+      dragStartRef.current = null;
+      isDraggingRef.current = false;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   }, [id, hasChildren]);
 
   // Handle double click to edit
@@ -258,8 +288,7 @@ export function MindmapNode({
       >
         {leftHandleType === 'source' && (
           <div
-            onClick={handleToggleChildren}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={handleCollapseButtonMouseDown}
             className="nodrag nopan"
             style={{
               position: 'absolute',
@@ -392,8 +421,7 @@ export function MindmapNode({
       >
         {rightHandleType === 'source' && (
           <div
-            onClick={handleToggleChildren}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={handleCollapseButtonMouseDown}
             className="nodrag nopan"
             style={{
               position: 'absolute',

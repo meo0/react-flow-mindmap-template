@@ -23,7 +23,7 @@ import { initialEdges, edgeTypes } from './edges';
 import { useMindmapLayout } from './hooks/useMindmapLayout';
 import { useMindmapDrag } from './hooks/useMindmapDrag';
 import { useViewportUtils } from './hooks/useViewportUtils';
-import { calculateNodeSize } from './lib/layout';
+import { calculateNodeSize, estimateNewNodePosition } from './lib/layout';
 import type { AppNode, MindmapNodeData } from './nodes/types';
 
 // Custom events
@@ -148,9 +148,10 @@ function Flow() {
       targetHandle = nodeBranch === 'r' ? 'l' : 'r';
 
       const newId = uuidv4();
+      const initialPosition = estimateNewNodePosition(nodes, nodeId, true, nodeBranch);
       const newNode: AppNode = {
         id: newId,
-        position: { x: 0, y: 0 }, // Will be positioned by autoLayout
+        position: initialPosition,
         data: {
           label: 'New Topic',
           hidChildren: false,
@@ -216,9 +217,10 @@ function Flow() {
       const targetHandle = parentEdge.targetHandle || (nodeBranch === 'r' ? 'l' : 'r');
 
       const newId = uuidv4();
+      const initialPosition = estimateNewNodePosition(nodes, nodeId, false, nodeBranch);
       const newNode: AppNode = {
         id: newId,
-        position: { x: 0, y: 0 }, // Will be positioned by autoLayout
+        position: initialPosition,
         data: {
           label: 'New Topic',
           hidChildren: false,
