@@ -21,6 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { useMindmapLayout } from './hooks/useMindmapLayout';
+import { useMindmapDrag } from './hooks/useMindmapDrag';
 import { calculateNodeSize } from './lib/layout';
 import type { AppNode, MindmapNodeData } from './nodes/types';
 
@@ -43,6 +44,12 @@ function Flow() {
     setNodes,
     { rootNodeId: 'root' }
   );
+
+  // Use the mindmap drag hook
+  const { onNodeDragStart, onNodeDrag, onNodeDragStop, getNodeDraggable } =
+    useMindmapDrag(nodes, edges, setNodes, setEdges, autoLayout, {
+      rootNodeId: 'root'
+    });
 
   // Auto-layout on initial render
   useEffect(() => {
@@ -168,16 +175,30 @@ function Flow() {
             type: 'mindmap'
           };
 
-          // Determine source handle (only for root node, same as reference)
-          const sourceHandle = sourceNode.id === 'root'
-            ? (position.x > sourceNode.position.x ? 'r' : 'l')
-            : undefined;
+          // Determine source and target handles based on branch
+          let sourceHandle: string | undefined;
+          let targetHandle: string | undefined;
+
+          if (sourceNode.id === 'root') {
+            // For root node, determine branch by position
+            const branch = position.x > sourceNode.position.x ? 'r' : 'l';
+            sourceHandle = branch;
+            targetHandle = branch === 'r' ? 'l' : 'r';
+          } else {
+            // For non-root nodes, inherit branch from parent's edge
+            const parentEdge = edges.find(e => e.target === sourceNode.id);
+            if (parentEdge?.sourceHandle) {
+              sourceHandle = parentEdge.sourceHandle;
+              targetHandle = parentEdge.sourceHandle === 'r' ? 'l' : 'r';
+            }
+          }
 
           const newEdge: Edge = {
             id: `${sourceNode.id}->${newId}`,
             source: sourceNode.id,
             sourceHandle,
-            target: newId
+            target: newId,
+            targetHandle
           };
 
           setNodes((nds) => [...nds, newNode]);
@@ -204,13 +225,22 @@ function Flow() {
     [autoLayout]
   );
 
+  // Get visible nodes with draggable property
+  const displayNodes = getVisibleNodes().map((node) => ({
+    ...node,
+    draggable: getNodeDraggable(node.id)
+  }));
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <ReactFlow
-        nodes={getVisibleNodes()}
+        nodes={displayNodes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onNodesDelete={onNodesDelete}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         edges={getVisibleEdges()}
         edgeTypes={edgeTypes}
         onEdgesChange={onEdgesChange}

@@ -31,14 +31,46 @@ export function MindmapNode({
   // Get current nodes and edges to determine handle types
   const nodes = getNodes();
   const edges = getEdges();
-  const nodeX = nodes.find(node => node.id === id)?.position.x ?? 0;
+
+  // Find the parent edge (edge where this node is the target)
+  const parentEdge = edges.find(e => e.target === id);
 
   // Determine if this is the root node (no incoming edges)
-  const isRootNode = !edges.some(e => e.target === id);
+  const isRootNode = !parentEdge;
 
-  // Handle types based on position (same as reference implementation)
-  const leftHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'source' : 'target');
-  const rightHandleType = isRootNode ? 'source' : (nodeX < 0 ? 'target' : 'source');
+  // Determine branch by traversing up to find an edge with explicit handles
+  // or by checking node position as fallback
+  const determineBranch = (): 'l' | 'r' => {
+    let currentNodeId = id;
+    let currentEdge = parentEdge;
+
+    // Traverse up the tree to find an edge with explicit handle info
+    while (currentEdge) {
+      // Check targetHandle first (more reliable after branch switch)
+      if (currentEdge.targetHandle === 'r') return 'l'; // targetHandle='r' means left branch
+      if (currentEdge.targetHandle === 'l') return 'r'; // targetHandle='l' means right branch
+      // Check sourceHandle as fallback
+      if (currentEdge.sourceHandle === 'l') return 'l';
+      if (currentEdge.sourceHandle === 'r') return 'r';
+
+      // Move up to parent
+      currentNodeId = currentEdge.source;
+      currentEdge = edges.find(e => e.target === currentNodeId);
+    }
+
+    // Fallback: use current node position
+    const nodeX = nodes.find(node => node.id === id)?.position.x ?? 0;
+    return nodeX < 0 ? 'l' : 'r';
+  };
+
+  const branch = isRootNode ? null : determineBranch();
+  const isLeftBranch = branch === 'l';
+
+  // Handle types based on branch
+  // Left branch: left=source (outgoing to children), right=target (incoming from parent)
+  // Right branch: left=target (incoming from parent), right=source (outgoing to children)
+  const leftHandleType = isRootNode ? 'source' : (isLeftBranch ? 'source' : 'target');
+  const rightHandleType = isRootNode ? 'source' : (isLeftBranch ? 'target' : 'source');
 
   // Calculate children count from edges (for non-collapsed state)
   const edgeChildCount = edges.filter(edge => edge.source === id).length;
