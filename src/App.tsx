@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  Panel,
   BackgroundVariant,
   addEdge,
   useNodesState,
@@ -429,22 +428,6 @@ function Flow() {
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={0.5} />
         <Controls />
-        <Panel position="top-right">
-          <button
-            onClick={autoLayout}
-            style={{
-              padding: '8px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            Auto Layout
-          </button>
-        </Panel>
       </ReactFlow>
     </div>
   );
