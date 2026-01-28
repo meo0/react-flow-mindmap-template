@@ -274,15 +274,11 @@ function Flow() {
     return () => window.removeEventListener(CREATE_SIBLING_EVENT, handleCreateSibling);
   }, [nodes, edges, setNodes, setEdges, autoLayout, ensureNodeVisible]);
 
-  // Handle new connections
-  const onConnect: OnConnect = useCallback(
-    (connection) => {
-      setEdges((eds) => addEdge(connection, eds));
-      // Re-layout after connection
-      setTimeout(autoLayout, 150);
-    },
-    [setEdges, autoLayout]
-  );
+  // Handle new connections - disabled to prevent connecting to existing nodes
+  // New nodes should only be created via dragging to empty space (onConnectEnd)
+  const onConnect: OnConnect = useCallback(() => {
+    // Do nothing - we don't want to connect to existing nodes
+  }, []);
 
   // Handle drag connection end (create new node)
   const onConnectEnd: OnConnectEnd = useCallback(
@@ -449,6 +445,7 @@ function Flow() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
+        isValidConnection={() => false}
         fitView
         style={rfStyle}
         deleteKeyCode={['Delete', 'Backspace']}
