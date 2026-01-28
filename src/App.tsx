@@ -82,6 +82,10 @@ function Flow() {
       const event = e as CustomEvent<{ nodeId: string }>;
       const nodeId = event.detail.nodeId;
 
+      // Check if we're expanding (will need delayed re-layout for node measurement)
+      const targetNode = nodes.find(n => n.id === nodeId);
+      const isExpanding = targetNode && (targetNode.data as MindmapNodeData).hidChildren === true;
+
       setNodes((nds) => {
         // Calculate total descendant count (all hidden nodes)
         const descendantCount = countAllDescendants(nodeId);
@@ -103,12 +107,17 @@ function Flow() {
       });
 
       // Re-layout after toggling
+      // When expanding, we need to wait for nodes to be measured by React Flow
+      // First layout positions the nodes, second layout applies accurate measurements
       setTimeout(autoLayout, 50);
+      if (isExpanding) {
+        setTimeout(autoLayout, 200);
+      }
     };
 
     window.addEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
     return () => window.removeEventListener(TOGGLE_CHILDREN_EVENT, handleToggleChildren);
-  }, [setNodes, edges, autoLayout]);
+  }, [nodes, setNodes, edges, autoLayout]);
 
   // Listen for create child events
   useEffect(() => {
